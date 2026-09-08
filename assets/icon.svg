@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Worktree Station app icon.
+       One trunk forking into four tracks, each ending in a commit node: one
+       repository, several working trees. The amber track is the one that wants
+       your attention, matching the status rule used throughout the app.
+       Tile is inset to 824x824 per the macOS icon grid, transparent outside. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#212430"/>
+      <stop offset="1" stop-color="#14151A"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+
+  <g fill="none" stroke-width="46" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Shared trunk -->
+    <path d="M512 822 V662" stroke="#8D96A8"/>
+
+    <!-- Three quiet tracks. Node spacing is even so the fan reads as one shape. -->
+    <path d="M512 662 L336 548 L336 430" stroke="#8D96A8"/>
+    <path d="M512 662 L572 542 L572 398" stroke="#8D96A8"/>
+    <path d="M512 662 L688 576 L688 462" stroke="#8D96A8"/>
+
+    <!-- The one that needs you -->
+    <path d="M512 662 L452 518 L452 366" stroke="#E9A23B"/>
+  </g>
+
+  <g>
+    <circle cx="336" cy="396" r="44" fill="#8D96A8"/>
+    <circle cx="572" cy="364" r="44" fill="#8D96A8"/>
+    <circle cx="688" cy="428" r="44" fill="#8D96A8"/>
+    <circle cx="452" cy="330" r="48" fill="#E9A23B"/>
+  </g>
+</svg>

@@ -1,0 +1,24 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Composite-build output from vue-tsc
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.sw?
+
+# Rust
+src-tauri/target/
+
+# Agent tooling state
+.omc/
+.claude/
+.code-review-graph/
