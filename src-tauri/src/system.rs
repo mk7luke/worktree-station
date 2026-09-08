@@ -50,18 +50,27 @@ pub fn reveal(path: &str) -> Result<(), String> {
     if !Path::new(path).exists() {
         return Err(format!("{path} no longer exists"));
     }
-    #[cfg(target_os = "macos")]
-    return spawn("open", &["-R", path]);
-    #[cfg(target_os = "windows")]
-    return spawn(
+    reveal_impl(path)
+}
+
+#[cfg(target_os = "macos")]
+fn reveal_impl(path: &str) -> Result<(), String> {
+    spawn("open", &["-R", path])
+}
+
+#[cfg(target_os = "windows")]
+fn reveal_impl(path: &str) -> Result<(), String> {
+    spawn(
         "explorer",
         &[&format!("/select,{}", path.replace('/', "\\"))],
-    );
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        let parent = Path::new(path).parent().unwrap_or(Path::new(path));
-        return spawn("xdg-open", &[&parent.to_string_lossy()]);
-    }
+    )
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn reveal_impl(path: &str) -> Result<(), String> {
+    // No portable "reveal"; opening the parent is the closest equivalent.
+    let parent = Path::new(path).parent().unwrap_or(Path::new(path));
+    spawn("xdg-open", &[&parent.to_string_lossy()])
 }
 
 /// Open the system terminal application at `path`.
@@ -69,65 +78,66 @@ pub fn open_terminal(path: &str) -> Result<(), String> {
     if !Path::new(path).is_dir() {
         return Err(format!("{path} is not a directory"));
     }
+    open_terminal_impl(path)
+}
 
-    #[cfg(target_os = "macos")]
-    {
-        // Respect the terminal the user actually uses, if it is installed.
-        for app in ["Ghostty", "iTerm", "WezTerm", "Alacritty", "kitty"] {
-            if Path::new(&format!("/Applications/{app}.app")).exists()
-                && spawn("open", &["-a", app, path]).is_ok()
-            {
+#[cfg(target_os = "macos")]
+fn open_terminal_impl(path: &str) -> Result<(), String> {
+    // Respect the terminal the user actually uses, if it is installed.
+    for app in ["Ghostty", "iTerm", "WezTerm", "Alacritty", "kitty"] {
+        if Path::new(&format!("/Applications/{app}.app")).exists()
+            && spawn("open", &["-a", app, path]).is_ok()
+        {
+            return Ok(());
+        }
+    }
+    spawn("open", &["-a", "Terminal", path])
+}
+
+#[cfg(target_os = "windows")]
+fn open_terminal_impl(path: &str) -> Result<(), String> {
+    let win_path = path.replace('/', "\\");
+    // Windows Terminal if available, otherwise a bare PowerShell window.
+    if which("wt").is_some() {
+        return spawn("wt", &["-d", &win_path]);
+    }
+    detached("cmd")
+        .args([
+            "/C",
+            "start",
+            "powershell",
+            "-NoExit",
+            "-Command",
+            "Set-Location",
+            "-LiteralPath",
+            &win_path,
+        ])
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Could not open a terminal: {e}"))
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn open_terminal_impl(path: &str) -> Result<(), String> {
+    for (exe, args) in [
+        ("gnome-terminal", vec!["--working-directory"]),
+        ("konsole", vec!["--workdir"]),
+        ("xfce4-terminal", vec!["--working-directory"]),
+        ("alacritty", vec!["--working-directory"]),
+        ("kitty", vec!["--directory"]),
+    ] {
+        if which(exe).is_some() {
+            let mut full: Vec<&str> = args;
+            full.push(path);
+            if spawn(exe, &full).is_ok() {
                 return Ok(());
             }
         }
-        spawn("open", &["-a", "Terminal", path])
     }
-
-    #[cfg(target_os = "windows")]
-    {
-        let win_path = path.replace('/', "\\");
-        // Windows Terminal if available, otherwise a bare PowerShell window.
-        if which("wt").is_some() {
-            return spawn("wt", &["-d", &win_path]);
-        }
-        return detached("cmd")
-            .args([
-                "/C",
-                "start",
-                "powershell",
-                "-NoExit",
-                "-Command",
-                "Set-Location",
-                "-LiteralPath",
-                &win_path,
-            ])
-            .spawn()
-            .map(|_| ())
-            .map_err(|e| format!("Could not open a terminal: {e}"));
+    if which("x-terminal-emulator").is_some() {
+        return spawn("x-terminal-emulator", &[]);
     }
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        for (exe, args) in [
-            ("gnome-terminal", vec!["--working-directory"]),
-            ("konsole", vec!["--workdir"]),
-            ("xfce4-terminal", vec!["--working-directory"]),
-            ("alacritty", vec!["--working-directory"]),
-            ("kitty", vec!["--directory"]),
-        ] {
-            if which(exe).is_some() {
-                let mut full: Vec<&str> = args;
-                full.push(path);
-                if spawn(exe, &full).is_ok() {
-                    return Ok(());
-                }
-            }
-        }
-        if which("x-terminal-emulator").is_some() {
-            return spawn("x-terminal-emulator", &[]);
-        }
-        return Err("No terminal emulator found".into());
-    }
+    Err("No terminal emulator found".into())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

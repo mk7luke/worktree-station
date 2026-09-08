@@ -12,38 +12,37 @@ use std::path::{Path, PathBuf};
 
 /// Directories the OS loads fonts from, most specific (per-user) first.
 fn font_dirs() -> Vec<PathBuf> {
-    let home = dirs::home_dir();
-    let mut dirs = Vec::new();
+    let mut out: Vec<PathBuf> = Vec::new();
 
     #[cfg(target_os = "macos")]
     {
-        if let Some(h) = &home {
-            dirs.push(h.join("Library/Fonts"));
+        if let Some(home) = dirs::home_dir() {
+            out.push(home.join("Library/Fonts"));
         }
-        dirs.push(PathBuf::from("/Library/Fonts"));
-        dirs.push(PathBuf::from("/System/Library/Fonts"));
-        dirs.push(PathBuf::from("/System/Library/Fonts/Supplemental"));
+        out.push(PathBuf::from("/Library/Fonts"));
+        out.push(PathBuf::from("/System/Library/Fonts"));
+        out.push(PathBuf::from("/System/Library/Fonts/Supplemental"));
     }
     #[cfg(target_os = "windows")]
     {
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            dirs.push(PathBuf::from(local).join("Microsoft/Windows/Fonts"));
+            out.push(PathBuf::from(local).join("Microsoft/Windows/Fonts"));
         }
         if let Some(win) = std::env::var_os("WINDIR") {
-            dirs.push(PathBuf::from(win).join("Fonts"));
+            out.push(PathBuf::from(win).join("Fonts"));
         }
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        if let Some(h) = &home {
-            dirs.push(h.join(".fonts"));
-            dirs.push(h.join(".local/share/fonts"));
+        if let Some(home) = dirs::home_dir() {
+            out.push(home.join(".fonts"));
+            out.push(home.join(".local/share/fonts"));
         }
-        dirs.push(PathBuf::from("/usr/share/fonts"));
-        dirs.push(PathBuf::from("/usr/local/share/fonts"));
+        out.push(PathBuf::from("/usr/share/fonts"));
+        out.push(PathBuf::from("/usr/local/share/fonts"));
     }
 
-    dirs.into_iter().filter(|d| d.is_dir()).collect()
+    out.into_iter().filter(|d| d.is_dir()).collect()
 }
 
 /// How deep to walk a font directory. macOS and Windows keep font files
