@@ -1,5 +1,8 @@
 # Worktree Station
 
+[![CI](https://github.com/mk7luke/worktree-station/actions/workflows/ci.yml/badge.svg)](https://github.com/mk7luke/worktree-station/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/mk7luke/worktree-station)](https://github.com/mk7luke/worktree-station/releases/latest)
+
 Run several coding agents on one repository at the same time, each in its own checkout, and see
 at a glance which one needs you.
 
