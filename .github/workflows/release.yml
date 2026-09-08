@@ -1,0 +1,88 @@
+name: Release
+
+# Tagging v* builds every platform and opens a draft release with the
+# installers attached. Tauri cannot cross-compile between desktop platforms,
+# so each one is built on its own runner.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # One universal binary covers both Apple Silicon and Intel.
+          - platform: macos-latest
+            target: universal-apple-darwin
+            args: "--target universal-apple-darwin"
+          # Built on the oldest supported Ubuntu so the glibc requirement
+          # stays low enough for other distributions.
+          - platform: ubuntu-22.04
+            target: ""
+            args: ""
+          - platform: windows-latest
+            target: ""
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            libssl-dev \
+            build-essential curl wget file
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: npm ci
+
+      - name: Check
+        run: |
+          npm run typecheck
+          cargo test --manifest-path src-tauri/Cargo.toml
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Worktree Station ${{ github.ref_name }}"
+          releaseBody: |
+            See the assets below for your platform.
+
+            **macOS** — the app is not signed or notarized yet, so Gatekeeper
+            will block it on first launch. After dragging it to Applications:
+
+            ```bash
+            xattr -cr "/Applications/Worktree Station.app"
+            ```
+
+            Then open it normally.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

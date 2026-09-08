@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Worktree Station",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "identifier": "io.github.mk7luke.worktreestation",
   "build": {
     "frontendDist": "../dist",
