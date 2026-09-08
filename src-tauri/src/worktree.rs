@@ -269,6 +269,11 @@ mod tests {
     #[test]
     fn suggested_path_combines_root_repo_and_branch() {
         let p = suggest_path("/Users/dev/worktrees", "/Users/dev/code/proj", "feature/login");
-        assert_eq!(p, "/Users/dev/worktrees/proj-feature-login");
+        // Compare as paths, not strings: joining produces a backslash on
+        // Windows, so a literal forward-slash string would not match there.
+        assert_eq!(
+            Path::new(&p),
+            Path::new("/Users/dev/worktrees").join("proj-feature-login")
+        );
     }
 }

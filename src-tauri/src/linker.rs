@@ -6,7 +6,7 @@
 //! files, globs — is honoured by git itself rather than re-implemented here.
 
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use crate::git;
 
@@ -101,7 +101,13 @@ pub fn candidates(repo_root: &str) -> Result<Vec<LinkTarget>, String> {
 /// Reject anything that escapes the repository root. `rel` arrives from the
 /// frontend, so it is untrusted even though we produced the original list.
 fn safe_join(root: &Path, rel: &str) -> Option<PathBuf> {
-    if rel.is_empty() || Path::new(rel).is_absolute() {
+    let candidate = Path::new(rel);
+    // `is_absolute` alone is not enough on Windows, where a path only counts
+    // as absolute with a drive or UNC prefix — "/windows/system32" is merely
+    // rooted. Reject rooted and prefixed paths too, so the guard means the
+    // same thing on every platform.
+    let has_prefix = matches!(candidate.components().next(), Some(Component::Prefix(_)));
+    if rel.is_empty() || candidate.is_absolute() || candidate.has_root() || has_prefix {
         return None;
     }
     let mut out = root.to_path_buf();
@@ -390,6 +396,13 @@ mod tests {
         assert_eq!(safe_join(root, "apps/../../outside"), None);
         assert_eq!(safe_join(root, "/etc/passwd"), None);
         assert_eq!(safe_join(root, ""), None);
+        // On Unix these are legal, if odd, relative file names — only Windows
+        // treats them as rooted or drive-prefixed.
+        #[cfg(windows)]
+        {
+            assert_eq!(safe_join(root, "\\windows\\system32"), None);
+            assert_eq!(safe_join(root, "C:\\Windows"), None);
+        }
     }
 
     #[test]
