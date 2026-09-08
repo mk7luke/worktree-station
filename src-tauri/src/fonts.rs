@@ -46,6 +46,12 @@ fn font_dirs() -> Vec<PathBuf> {
     dirs.into_iter().filter(|d| d.is_dir()).collect()
 }
 
+/// How deep to walk a font directory. macOS and Windows keep font files
+/// directly in the directory, but Linux nests them by format and family —
+/// `/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf` is already three
+/// levels down, and some distributions go deeper still.
+const MAX_FONT_DEPTH: usize = 6;
+
 fn is_font_file(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref(),
@@ -184,9 +190,8 @@ pub fn monospace_families() -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
 
     for dir in font_dirs() {
-        // One level of nesting covers how Linux groups fonts by foundry.
         let entries = walkdir::WalkDir::new(&dir)
-            .max_depth(2)
+            .max_depth(MAX_FONT_DEPTH)
             .into_iter()
             .filter_map(Result::ok);
 
@@ -224,17 +229,42 @@ pub fn monospace_families() -> Vec<String> {
 mod tests {
     use super::*;
 
+    /// Walk without a depth limit, so the test can tell "this machine has no
+    /// fonts" apart from "the walker never reached them".
+    fn font_files_exist_anywhere() -> bool {
+        font_dirs().iter().any(|dir| {
+            walkdir::WalkDir::new(dir)
+                .into_iter()
+                .filter_map(Result::ok)
+                .any(|e| e.file_type().is_file() && is_font_file(e.path()))
+        })
+    }
+
     #[test]
-    fn finds_monospace_families_on_this_machine() {
+    fn finds_every_installed_monospace_family() {
         let families = monospace_families();
-        // Every desktop OS ships at least one fixed-pitch face.
-        assert!(!families.is_empty(), "no monospace fonts found at all");
-        // Names must be human-readable family names, not file names.
+
+        // If any font file is reachable at all, the walker must have found
+        // families. This is what catches a depth limit set too shallow for the
+        // way a platform nests its font directories.
+        if font_files_exist_anywhere() {
+            assert!(
+                !families.is_empty(),
+                "font files exist on this machine but none were enumerated — \
+                 MAX_FONT_DEPTH is probably too shallow for this platform's layout"
+            );
+        }
+
+        // Family names, not file names.
         assert!(families.iter().all(|f| !f.ends_with(".ttf") && !f.ends_with(".otf")));
-        // The list is deduplicated and sorted.
+        // Sorted and deduplicated.
         let mut sorted = families.clone();
         sorted.sort_by_key(|f| f.to_lowercase());
-        assert_eq!(families, sorted);
+        assert_eq!(families, sorted, "families are not sorted");
+        let mut deduped = families.clone();
+        deduped.dedup();
+        assert_eq!(families.len(), deduped.len(), "families contain duplicates");
+
         eprintln!("found {} families: {:?}", families.len(), families);
     }
 }
