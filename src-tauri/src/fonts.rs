@@ -54,7 +54,10 @@ const MAX_FONT_DEPTH: usize = 6;
 
 fn is_font_file(path: &Path) -> bool {
     matches!(
-        path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref(),
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
         Some("ttf") | Some("otf") | Some("ttc") | Some("otc")
     )
 }
@@ -256,7 +259,9 @@ mod tests {
         }
 
         // Family names, not file names.
-        assert!(families.iter().all(|f| !f.ends_with(".ttf") && !f.ends_with(".otf")));
+        assert!(families
+            .iter()
+            .all(|f| !f.ends_with(".ttf") && !f.ends_with(".otf")));
         // Sorted and deduplicated.
         let mut sorted = families.clone();
         sorted.sort_by_key(|f| f.to_lowercase());

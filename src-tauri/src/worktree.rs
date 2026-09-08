@@ -194,11 +194,9 @@ pub fn remove(req: RemoveRequest) -> Result<(), String> {
     }
     args.push(&req.worktree_path);
 
-    if let Err(e) = git::run(root, &args) {
-        // Without --force git refuses on a dirty tree; surface that verbatim so
-        // the UI can offer to retry with force rather than silently destroying work.
-        return Err(e);
-    }
+    // Without --force git refuses on a dirty tree; that error is surfaced
+    // verbatim so the UI can offer to retry rather than silently destroy work.
+    git::run(root, &args)?;
 
     // Junctions and symlinks we created can leave the directory behind. It is
     // safe to remove now: git has already accepted the removal, and
@@ -229,7 +227,9 @@ pub fn remove(req: RemoveRequest) -> Result<(), String> {
 
     if req.delete_remote_branch {
         let (remote, remote_branch) = upstream.ok_or_else(|| {
-            format!("'{branch}' does not track a remote branch, so there was nothing to delete there")
+            format!(
+                "'{branch}' does not track a remote branch, so there was nothing to delete there"
+            )
         })?;
         git::run(root, &["push", &remote, "--delete", &remote_branch]).map_err(|e| {
             format!("Removed locally, but {remote}/{remote_branch} is still on the remote: {e}")
@@ -268,7 +268,11 @@ mod tests {
 
     #[test]
     fn suggested_path_combines_root_repo_and_branch() {
-        let p = suggest_path("/Users/dev/worktrees", "/Users/dev/code/proj", "feature/login");
+        let p = suggest_path(
+            "/Users/dev/worktrees",
+            "/Users/dev/code/proj",
+            "feature/login",
+        );
         // Compare as paths, not strings: joining produces a backslash on
         // Windows, so a literal forward-slash string would not match there.
         assert_eq!(

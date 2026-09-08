@@ -50,8 +50,6 @@ impl PtyManager {
     pub fn new() -> Self {
         Self::default()
     }
-
-
 }
 
 /// The interactive shell to run, as a login shell so the user's PATH (nvm,
@@ -60,7 +58,11 @@ fn shell_command(cwd: &str) -> CommandBuilder {
     #[cfg(windows)]
     let mut cmd = {
         // Prefer PowerShell 7 when present, else Windows PowerShell.
-        let exe = if which("pwsh.exe").is_some() { "pwsh.exe" } else { "powershell.exe" };
+        let exe = if which("pwsh.exe").is_some() {
+            "pwsh.exe"
+        } else {
+            "powershell.exe"
+        };
         let mut c = CommandBuilder::new(exe);
         c.args(["-NoLogo", "-NoExit"]);
         c

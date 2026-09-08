@@ -53,7 +53,10 @@ pub fn reveal(path: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     return spawn("open", &["-R", path]);
     #[cfg(target_os = "windows")]
-    return spawn("explorer", &[&format!("/select,{}", path.replace('/', "\\"))]);
+    return spawn(
+        "explorer",
+        &[&format!("/select,{}", path.replace('/', "\\"))],
+    );
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         let parent = Path::new(path).parent().unwrap_or(Path::new(path));
@@ -71,13 +74,13 @@ pub fn open_terminal(path: &str) -> Result<(), String> {
     {
         // Respect the terminal the user actually uses, if it is installed.
         for app in ["Ghostty", "iTerm", "WezTerm", "Alacritty", "kitty"] {
-            if Path::new(&format!("/Applications/{app}.app")).exists() {
-                if spawn("open", &["-a", app, path]).is_ok() {
-                    return Ok(());
-                }
+            if Path::new(&format!("/Applications/{app}.app")).exists()
+                && spawn("open", &["-a", app, path]).is_ok()
+            {
+                return Ok(());
             }
         }
-        return spawn("open", &["-a", "Terminal", path]);
+        spawn("open", &["-a", "Terminal", path])
     }
 
     #[cfg(target_os = "windows")]
@@ -88,7 +91,16 @@ pub fn open_terminal(path: &str) -> Result<(), String> {
             return spawn("wt", &["-d", &win_path]);
         }
         return detached("cmd")
-            .args(["/C", "start", "powershell", "-NoExit", "-Command", "Set-Location", "-LiteralPath", &win_path])
+            .args([
+                "/C",
+                "start",
+                "powershell",
+                "-NoExit",
+                "-Command",
+                "Set-Location",
+                "-LiteralPath",
+                &win_path,
+            ])
             .spawn()
             .map(|_| ())
             .map_err(|e| format!("Could not open a terminal: {e}"));

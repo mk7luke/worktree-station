@@ -97,7 +97,10 @@ pub fn resolve_repo_root(path: &str) -> Result<String, String> {
     // `--path-format=absolute` keeps this correct when git is invoked from a
     // subdirectory, and `--git-common-dir` points at the *main* .git even when
     // `path` is itself a linked worktree.
-    let common = run(p, &["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
+    let common = run(
+        p,
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    )?;
     let common = common.trim();
     if common.is_empty() {
         return Err(format!("{path} is not inside a git repository"));
@@ -133,7 +136,15 @@ pub fn repo_info(root: &str) -> Result<RepoInfo, String> {
 /// Best-effort guess at the repository's integration branch.
 pub fn default_branch(cwd: &Path) -> String {
     // Prefer what the remote actually says.
-    if let Ok(s) = run(cwd, &["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]) {
+    if let Ok(s) = run(
+        cwd,
+        &[
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ],
+    ) {
         if let Some(b) = s.trim().strip_prefix("origin/") {
             if !b.is_empty() {
                 return b.to_owned();
@@ -141,7 +152,15 @@ pub fn default_branch(cwd: &Path) -> String {
         }
     }
     for candidate in ["main", "master", "develop", "trunk"] {
-        if ok(cwd, &["show-ref", "--verify", "--quiet", &format!("refs/heads/{candidate}")]) {
+        if ok(
+            cwd,
+            &[
+                "show-ref",
+                "--verify",
+                "--quiet",
+                &format!("refs/heads/{candidate}"),
+            ],
+        ) {
             return candidate.to_owned();
         }
     }
@@ -204,7 +223,12 @@ pub fn parse_worktree_list(out: &str) -> Vec<Worktree> {
             }
             "branch" => {
                 if let Some(w) = cur.as_mut() {
-                    w.branch = Some(value.strip_prefix("refs/heads/").unwrap_or(value).to_owned());
+                    w.branch = Some(
+                        value
+                            .strip_prefix("refs/heads/")
+                            .unwrap_or(value)
+                            .to_owned(),
+                    );
                 }
             }
             // The flag-style keys carry an optional reason after the keyword.
@@ -243,7 +267,15 @@ pub fn status(worktree_path: &str) -> Result<WorktreeStatus, String> {
     }
     let mut st = WorktreeStatus::default();
 
-    let porcelain = run(p, &["status", "--porcelain=v2", "--branch", "--untracked-files=normal"])?;
+    let porcelain = run(
+        p,
+        &[
+            "status",
+            "--porcelain=v2",
+            "--branch",
+            "--untracked-files=normal",
+        ],
+    )?;
     parse_status_v2(&porcelain, &mut st);
 
     // `%s` subject, `%an` author, `%cr` committer date relative — one line each
@@ -340,7 +372,12 @@ pub fn list_branches(root: &str) -> Result<Vec<BranchRef>, String> {
 pub fn branch_exists(root: &str, branch: &str) -> bool {
     ok(
         Path::new(root),
-        &["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch}")],
+        &[
+            "show-ref",
+            "--verify",
+            "--quiet",
+            &format!("refs/heads/{branch}"),
+        ],
     )
 }
 
@@ -349,13 +386,30 @@ pub fn validate_branch_name(root: &str, branch: &str) -> Result<(), String> {
     if branch.trim().is_empty() {
         return Err("Branch name is required".into());
     }
-    if !ok(
-        Path::new(root),
-        &["check-ref-format", "--branch", branch],
-    ) {
+    if !ok(Path::new(root), &["check-ref-format", "--branch", branch]) {
         return Err(format!("'{branch}' is not a valid branch name"));
     }
     Ok(())
+}
+
+/// The remote and branch name a local branch tracks, e.g. ("origin", "feat/login").
+/// `None` when the branch has no upstream configured.
+pub fn upstream_of(root: &str, branch: &str) -> Option<(String, String)> {
+    let out = run(
+        Path::new(root),
+        &[
+            "for-each-ref",
+            "--format=%(upstream:remotename)%09%(upstream:lstrip=3)",
+            &format!("refs/heads/{branch}"),
+        ],
+    )
+    .ok()?;
+    let line = out.lines().next()?;
+    let (remote, name) = line.split_once('\t')?;
+    if remote.trim().is_empty() || name.trim().is_empty() {
+        return None;
+    }
+    Some((remote.trim().to_owned(), name.trim().to_owned()))
 }
 
 #[cfg(test)]
@@ -451,27 +505,10 @@ u UU N... 100644 100644 100644 100644 aaa bbb ccc conflict.txt
         let out = "# branch.oid abc\n# branch.head main\n";
         let mut st = WorktreeStatus::default();
         parse_status_v2(out, &mut st);
-        assert_eq!((st.ahead, st.behind, st.staged, st.unstaged, st.untracked), (0, 0, 0, 0, 0));
+        assert_eq!(
+            (st.ahead, st.behind, st.staged, st.unstaged, st.untracked),
+            (0, 0, 0, 0, 0)
+        );
         assert!(st.upstream.is_none());
     }
-}
-
-/// The remote and branch name a local branch tracks, e.g. ("origin", "feat/login").
-/// `None` when the branch has no upstream configured.
-pub fn upstream_of(root: &str, branch: &str) -> Option<(String, String)> {
-    let out = run(
-        Path::new(root),
-        &[
-            "for-each-ref",
-            "--format=%(upstream:remotename)%09%(upstream:lstrip=3)",
-            &format!("refs/heads/{branch}"),
-        ],
-    )
-    .ok()?;
-    let line = out.lines().next()?;
-    let (remote, name) = line.split_once('\t')?;
-    if remote.trim().is_empty() || name.trim().is_empty() {
-        return None;
-    }
-    Some((remote.trim().to_owned(), name.trim().to_owned()))
 }

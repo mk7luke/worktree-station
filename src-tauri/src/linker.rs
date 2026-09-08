@@ -209,7 +209,15 @@ fn record_excludes(repo_root: &Path, rels: &[String]) -> Result<(), String> {
     if rels.is_empty() {
         return Ok(());
     }
-    let exclude_path = git::run(repo_root, &["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"])?;
+    let exclude_path = git::run(
+        repo_root,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "info/exclude",
+        ],
+    )?;
     let exclude_path = PathBuf::from(exclude_path.trim());
     if let Some(parent) = exclude_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;

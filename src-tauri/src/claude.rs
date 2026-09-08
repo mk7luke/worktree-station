@@ -9,7 +9,7 @@ use axum::{extract::State as AxumState, routing::post, Json, Router};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_notification::NotificationExt;
@@ -136,7 +136,7 @@ fn script_path() -> Result<PathBuf, String> {
 }
 
 #[cfg(not(windows))]
-fn write_script(path: &PathBuf) -> Result<(), String> {
+fn write_script(path: &Path) -> Result<(), String> {
     // POSIX sh, no dependencies beyond curl. Always exits 0 so a stopped app
     // can never block a Claude session.
     let body = format!(
@@ -160,7 +160,7 @@ exit 0
 }
 
 #[cfg(windows)]
-fn write_script(path: &PathBuf) -> Result<(), String> {
+fn write_script(path: &Path) -> Result<(), String> {
     let body = format!(
         r#"# {HOOK_MARKER} — reports Claude Code activity to Worktree Station.
 param([string]$Status)
@@ -180,7 +180,7 @@ exit 0
     std::fs::write(path, bytes).map_err(|e| e.to_string())
 }
 
-fn hook_command(script: &PathBuf, event: &str) -> String {
+fn hook_command(script: &Path, event: &str) -> String {
     #[cfg(windows)]
     {
         format!(
@@ -195,14 +195,14 @@ fn hook_command(script: &PathBuf, event: &str) -> String {
     }
 }
 
-fn read_settings(path: &PathBuf) -> serde_json::Value {
+fn read_settings(path: &Path) -> serde_json::Value {
     std::fs::read_to_string(path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_else(|| serde_json::json!({}))
 }
 
-fn write_settings(path: &PathBuf, value: &serde_json::Value) -> Result<(), String> {
+fn write_settings(path: &Path, value: &serde_json::Value) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -219,7 +219,11 @@ fn strip_our_entries(hooks: &mut serde_json::Value) {
     };
     for (_event, entries) in map.iter_mut() {
         if let Some(list) = entries.as_array_mut() {
-            list.retain(|entry| !serde_json::to_string(entry).unwrap_or_default().contains(HOOK_MARKER));
+            list.retain(|entry| {
+                !serde_json::to_string(entry)
+                    .unwrap_or_default()
+                    .contains(HOOK_MARKER)
+            });
         }
     }
     map.retain(|_, entries| entries.as_array().map(|l| !l.is_empty()).unwrap_or(true));
@@ -236,8 +240,14 @@ pub fn install_hooks() -> Result<String, String> {
     if !settings.is_object() {
         return Err("~/.claude/settings.json is not a JSON object; not touching it".into());
     }
-    if settings.get("hooks").map(|h| !h.is_object()).unwrap_or(false) {
-        return Err("~/.claude/settings.json has an unexpected \"hooks\" value; not touching it".into());
+    if settings
+        .get("hooks")
+        .map(|h| !h.is_object())
+        .unwrap_or(false)
+    {
+        return Err(
+            "~/.claude/settings.json has an unexpected \"hooks\" value; not touching it".into(),
+        );
     }
     if settings.get("hooks").is_none() {
         settings["hooks"] = serde_json::json!({});
